@@ -3,9 +3,14 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 
 test('deploy-main script parses as valid PowerShell', async (t) => {
-  const shell = resolvePowerShellExecutable();
+  const shell = getPowerShellShellOrSkip(t, () => null);
+  assert.equal(shell, null);
+});
+
+test('deploy-main script parses as valid PowerShell when available', async (t) => {
+  const shell = getPowerShellShellOrSkip(t);
   if (!shell) {
-    t.skip('PowerShell is not installed on this platform');
+    return;
   }
 
   const result = await runPowerShell(
@@ -28,6 +33,15 @@ function resolvePowerShellExecutable() {
   }
 
   return null;
+}
+
+function getPowerShellShellOrSkip(t, resolver = resolvePowerShellExecutable) {
+  const shell = resolver();
+  if (!shell) {
+    t.skip('PowerShell is not installed on this platform');
+    return null;
+  }
+  return shell;
 }
 
 function runPowerShell(shell, command) {
