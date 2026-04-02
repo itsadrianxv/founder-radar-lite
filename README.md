@@ -3,6 +3,8 @@
 一个轻量、近乎无状态的每日 `Founder Radar`。  
 它直接读取 `follow-builders` 的远程 feed，筛出核心硅谷 AI 构建者信号，生成一份适合 `Lark` 私聊阅读的 Markdown 简报。
 
+Inspired by [follow-builders by zarazhangrui](https://github.com/zarazhangrui/follow-builders).
+
 ## 特性
 
 - 单次运行、无数据库、无长期 memory
