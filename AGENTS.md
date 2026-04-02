@@ -11,20 +11,21 @@
 - 服务器登录用户：`admin`
 - 服务器部署路径：`/home/admin/apps/founder-radar-lite`
 
-## 当前生产发送方案
+## 当前标准生产方案
 
-当前**生产推荐方案**不是 OpenClaw cron，而是：
+当前推荐的标准生产链路是：
 
-1. 在服务器本地运行 `node src/cli.js run`
-2. 通过 `node src/send-lark.js` 直接调用 Lark 官方 API 发送
-3. 通过 `scripts/run-and-send.sh` 把“生成 + 发送”串起来
-4. 用系统 `crontab` 每天定时执行
+1. 在阿里云服务器上常驻 `OpenClaw Gateway`
+2. 用 `OpenClaw cron` 定时触发本仓库 skill
+3. skill 运行 `node src/cli.js deliver`
+4. 仓库脚本直接调用 Lark 官方 API，把深度日报分 3–5 条富文本消息发到飞书
+5. `OpenClaw` 只负责调度与状态回报，不再直接转发原始 Markdown 正文
 
-原因：
+这样做的原因是：
 
-- OpenClaw + Lark channel 已经配置过，也能收发消息
-- 但 OpenClaw cron 在 Founder Radar 发送场景里触发过多次 approval / elevated / memory / identity 偏航问题
-- 直连 Lark API 更稳定、边界更清晰
+- 仍然保留 OpenClaw 在调度上的便利
+- 把最终正文发送收回仓库脚本，避免飞书里出现难看的原始 Markdown
+- 便于在仓库内统一控制摘要深度、分段策略和发送格式
 
 ## 生产所需环境变量
 
@@ -32,6 +33,9 @@
 
 - `FOLLOW_BUILDERS_FEED_BASE_URL`
 - `FOUNDER_RADAR_LANGUAGE`
+- `FOUNDER_RADAR_LLM_BASE_URL`
+- `FOUNDER_RADAR_LLM_API_KEY`
+- `FOUNDER_RADAR_LLM_MODEL`
 - `LARK_APP_ID`
 - `LARK_APP_SECRET`
 - `LARK_RECIPIENT_OPEN_ID`
@@ -41,6 +45,9 @@
 ```bash
 export FOLLOW_BUILDERS_FEED_BASE_URL="https://raw.githubusercontent.com/zarazhangrui/follow-builders/main"
 export FOUNDER_RADAR_LANGUAGE="zh-CN"
+export FOUNDER_RADAR_LLM_BASE_URL="https://api.deepseek.com/v1"
+export FOUNDER_RADAR_LLM_API_KEY="your_api_key"
+export FOUNDER_RADAR_LLM_MODEL="deepseek-reasoner"
 export LARK_APP_ID="cli_your_app_id"
 export LARK_APP_SECRET="your_app_secret"
 export LARK_RECIPIENT_OPEN_ID="ou_your_open_id"
@@ -65,33 +72,26 @@ git pull
 npm test
 ```
 
-### 3. 验证日报生成
+### 3. 验证日报预览
 
 ```bash
 node src/cli.js run
 ```
 
-### 4. 验证直接发送
+### 4. 验证真实投递
 
 ```bash
-printf '# Founder Radar\n\nHello from direct Lark API.' | node src/send-lark.js --to "$LARK_RECIPIENT_OPEN_ID" --stdin
+node src/cli.js deliver
 ```
 
-### 5. 验证完整链路
+### 5. 验证 OpenClaw 调度链路
 
-```bash
-bash ./scripts/run-and-send.sh
-```
+手动触发一次对应的 `OpenClaw cron`，确认飞书能收到精排后的 3–5 条中文深度消息。
 
 ## 推荐自动化方式
 
-编辑服务器上的 `crontab`：
-
-```cron
-0 9 * * * cd /home/admin/apps/founder-radar-lite && /usr/bin/env bash ./scripts/run-and-send.sh >> /tmp/founder-radar-cron.log 2>&1
-```
-
-这就是当前的标准自动化方式。
+推荐仍然使用 `OpenClaw cron`，而不是系统 `crontab` 直接发正文。
+`scripts/run-and-send.sh` 作为统一入口，内部只调用 `node src/cli.js deliver`。
 
 ## 本地修改后如何部署
 
@@ -110,33 +110,26 @@ bash ./scripts/run-and-send.sh
 1. `cd /home/admin/apps/founder-radar-lite`
 2. `git pull`
 3. `npm test`
-4. 如改动涉及发送链路，运行：
-   - `bash ./scripts/run-and-send.sh`
-5. 若改动涉及环境变量，更新服务器环境或 `.env`
+4. 运行 `node src/cli.js deliver`
+5. 如需验证调度，再手动触发一次 OpenClaw cron
+6. 若改动涉及环境变量，更新服务器环境或 `.env`
 
 ## 关于 OpenClaw
 
-OpenClaw 当前状态：
+OpenClaw 当前在本项目里的角色是：
 
-- 已安装
-- Gateway 可运行
-- Feishu/Lark channel 可连接
-- 可用于实验性对话和 bot 调试
+- **负责调度**
+- **负责状态回报**
+- **不负责直接转发日报正文**
 
-但是：
+如果未来重新切回“OpenClaw 直接发送正文”的路线，需要重新确认：
 
-- **不要默认使用 OpenClaw cron 来发送 Founder Radar**
-- 除非用户明确要求继续走 OpenClaw 发送链路
-
-如果未来必须回到 OpenClaw 路径，需要重新确认：
-
-- pairing
-- device approvals
-- elevated mode
-- exec approvals
-- Lark 权限是否齐全
+- 飞书渲染能力是否满足排版要求
+- cron 执行时的 approval / memory / identity 行为是否可控
+- 是否还能保证最终收到的是精排内容而不是原始 Markdown
 
 ## 文档入口
 
-- 直连 Lark API 部署说明：`docs/direct-lark-api-setup.md`
+- OpenClaw 调度说明：`docs/openclaw-lark-setup.md`
+- 仓库内飞书投递说明：`docs/direct-lark-api-setup.md`
 - 初始化踩坑记录：`docs/learnt/initial_setup.md`

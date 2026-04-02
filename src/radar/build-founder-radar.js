@@ -56,6 +56,31 @@ export function buildFounderRadar(input, options = {}) {
   };
 }
 
+export function buildDeepFounderRadarReport(input, options = {}) {
+  const brief = buildFounderRadar(input, options);
+  const dateLabel = formatReportDate(input.generatedAt);
+  const topSignals = brief.sections.topSignals;
+  const whoToWatch = brief.sections.whoToWatch;
+  const opportunities = brief.sections.opportunities;
+  const report = {
+    title: `Founder Radar 深度日报｜${dateLabel}`,
+    intro: `这份深度日报继续以 follow-builders 为核心信号输入，只保留本仓库定义的高信号构建者与内容源。今天进入视野的重点，不是单条新闻本身，而是这些信号共同描出的组织、工作流与分发变化：构建者已经开始把模型能力从“能展示”推进到“能交付、能审核、能复盘”。`,
+    sections: {
+      todayVerdict: brief.sections.verdicts.map((verdict, index) => expandVerdict(verdict, topSignals, opportunities[index])),
+      coreArguments: buildCoreArguments(topSignals),
+      counterpoints: buildCounterpoints(topSignals),
+      actionItems: buildActionItems(opportunities, whoToWatch),
+      readNext: buildReadNextLinks(topSignals, brief.sections.readNext)
+    }
+  };
+
+  return {
+    ...report,
+    brief,
+    markdown: renderDeepDigestMarkdown(report)
+  };
+}
+
 function collectCandidates(input) {
   const groupedAccounts = new Map();
   for (const account of input.x || []) {
@@ -375,4 +400,175 @@ function countUniqueMeaningfulWords(text) {
     .filter((word) => word.length > 3);
 
   return new Set(words).size;
+}
+
+function formatReportDate(generatedAt) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'Asia/Shanghai'
+  }).format(new Date(generatedAt || Date.now()));
+}
+
+function buildActorLabel(signal) {
+  return signal.handle ? `${signal.sourceName} (@${signal.handle})` : signal.sourceName;
+}
+
+function expandVerdict(verdict, topSignals, opportunity) {
+  const referencedActors = topSignals
+    .slice(0, 2)
+    .map((signal) => buildActorLabel(signal))
+    .join('、');
+  const opportunityLine = opportunity
+    ? `从行动层面看，最值得先试的方向是“${opportunity.headline}”，因为它最接近今天这组信号真正指向的交付瓶颈。`
+    : '从行动层面看，最重要的不是继续收集观点，而是找出你团队里最值得被产品化的一条关键链路。';
+
+  return `${verdict} 更具体地说，今天最强的证据不是孤立出现的，而是由 ${referencedActors || '多位核心信号源'} 一起拼出来的同一幅图景：大家都在把 AI 能力往真实工作流、团队杠杆和产品交付上压。${opportunityLine}`;
+}
+
+function buildCoreArguments(topSignals) {
+  const agentSignals = pickSignalsByTheme(topSignals, 'agents', 3);
+  const researchSignals = pickSignalsByTheme(topSignals, 'research', 2);
+  const teamSignals = pickSignalsByTheme(topSignals, 'teams', 2);
+  const distributionSignals = pickSignalsByTheme(topSignals, 'distribution', 2);
+
+  return [
+    {
+      title: '论证一：agent 工作流已经从概念展示走向交付基础设施',
+      paragraphs: [
+        `今天最值得警惕的误判，是把 agent 讨论继续理解成“又一个会写代码、会回答问题的演示”。从 ${agentSignals.map((signal) => buildActorLabel(signal)).join('、') || topSignals.map((signal) => buildActorLabel(signal)).slice(0, 2).join('、')} 这些信号可以看出，真正被反复强调的是工具挑选、审核机制、交付稳定性和流程闭环。也就是说，产品竞争焦点已经开始从模型能不能做，切换成整条链路能不能稳定交付。`,
+        `这类变化会改变创业判断：下一批更有机会跑出来的产品，不一定是“最通用”的助手，而更可能是那些把生成、审核、发布、复盘做成默认工作台的产品。谁先把高频任务里的摩擦拿掉，谁就更有机会把模型能力变成组织习惯。`
+      ],
+      citations: agentSignals.map((signal) => ({
+        label: buildActorLabel(signal),
+        url: signal.url
+      }))
+    },
+    {
+      title: '论证二：研究与产品叙事正在互相抬高彼此的上限',
+      paragraphs: [
+        `像 ${researchSignals.map((signal) => buildActorLabel(signal)).join('、') || buildActorLabel(topSignals[0])} 这样的信号提醒我们，前沿进展不再只是实验室新闻。它们会直接改变用户的心理标尺：当大家看到模型能解决更难的问题、给出更优雅的结果，就会更自然地期待产品也该更可靠、更可解释、更能承担复杂任务。`,
+        `这会把很多表面上看起来是“产品优化”的工作，重新定义成“预期管理”。如果产品只会展示更强的模型，却没有把能力翻译成更稳定的体验和更易接手的协作方式，那么高预期最后只会变成高失望。`
+      ],
+      citations: researchSignals.map((signal) => ({
+        label: buildActorLabel(signal),
+        url: signal.url
+      }))
+    },
+    {
+      title: '论证三：小团队高杠杆会把更多价值推向中间层能力',
+      paragraphs: [
+        `无论是 ${teamSignals.map((signal) => buildActorLabel(signal)).join('、') || distributionSignals.map((signal) => buildActorLabel(signal)).join('、') || buildActorLabel(topSignals.at(-1))} 这样的团队/分发信号，还是今天机会种子里反复出现的“工作流闭环”，都在指向同一个结论：小团队要想真的做出更大产出，关键不只是多一个模型接口，而是要把权限、审阅、观测、回滚和复盘一起做扎实。`,
+        `换句话说，真正稀缺的不是一句“AI 会提升效率”，而是那些能在真实组织里被持续使用的中间层能力。它们不一定最显眼，却最接近企业愿意持续付费和团队愿意长期迁移的理由。`
+      ],
+      citations: [...teamSignals, ...distributionSignals].slice(0, 3).map((signal) => ({
+        label: buildActorLabel(signal),
+        url: signal.url
+      }))
+    }
+  ];
+}
+
+function buildCounterpoints(topSignals) {
+  const firstActor = topSignals[0] ? buildActorLabel(topSignals[0]) : '今天的头部信号';
+  const secondActor = topSignals[1] ? buildActorLabel(topSignals[1]) : '另一类高热度讨论';
+
+  return [
+    `第一，今天的高信号样本天然偏向愿意公开表达、愿意强化叙事的人群。${firstActor} 和 ${secondActor} 代表的是最前沿、最主动塑造预期的一批构建者，而不是整个市场的平均面貌。所以如果你直接把这组内容理解成“所有团队都已经完成组织升级”，很容易高估实际落地速度。`,
+    '第二，长工作流并不会天然带来更高价值。只要审核、权限和回滚机制没有同时升级，agent 只会更快地产生更多未经验证的内容。真正值得押注的，不是更长的自动化链条，而是那些在关键节点上能让人类更容易判断、接手和纠错的系统设计。'
+  ];
+}
+
+function buildActionItems(opportunities, whoToWatch) {
+  const watchNames = whoToWatch.map((item) => item.name).join('、') || '今天最强的几位构建者';
+
+  return [
+    {
+      title: `动作一：先找出你团队里最值得被产品化的一条关键链路`,
+      paragraphs: [
+        `今天最不该做的事，是再次从“我要不要做一个通用助手”开始。更好的起点，是从你团队已经重复发生、而且必须经过审核的那条链路开始下刀，比如“信息收集 → 初稿生成 → 人工审核 → 对外发布”。只要这条链路能做出稳定感，你就已经比绝大多数只停留在能力展示层的产品更接近真实价值。`
+      ]
+    },
+    {
+      title: '动作二：把默认输出格式升级成“结论 + 证据 + 风险”',
+      paragraphs: [
+        `如果模型已经要进入日常工作流，组织真正需要的不是更多文本，而是更容易被判断的文本。你可以要求所有 AI 产出都必须带上结论、证据链接和风险提示，这会显著降低团队对模型结果的心理阻力，也更容易把结果交接给下一位同事。`
+      ]
+    },
+    {
+      title: `动作三：持续跟踪 ${watchNames}，但重点研究他们背后的组织打法`,
+      paragraphs: [
+        `值得跟踪的不是谁又说了一句漂亮观点，而是谁在持续把研究、产品、交付和分发绑定成一套打法。关注这些人时，优先记录他们如何组织团队、怎样定义审核边界、哪些环节仍然保留人工决策。这些信息比单条热帖更接近你真正可以复用的方法。`
+      ]
+    }
+  ];
+}
+
+function buildReadNextLinks(topSignals, urls) {
+  const labelsByUrl = new Map(topSignals.map((signal) => [signal.url, buildActorLabel(signal)]));
+  return urls.map((url, index) => ({
+    label: labelsByUrl.get(url) || `延伸阅读 ${index + 1}`,
+    url
+  }));
+}
+
+function pickSignalsByTheme(signals, theme, count) {
+  const themedSignals = signals.filter((signal) => signal.themeTags.includes(theme));
+  if (themedSignals.length >= count) {
+    return themedSignals.slice(0, count);
+  }
+
+  const fallbackSignals = [...themedSignals];
+  for (const signal of signals) {
+    if (fallbackSignals.length >= count) break;
+    if (fallbackSignals.some((item) => item.url === signal.url)) continue;
+    fallbackSignals.push(signal);
+  }
+
+  return fallbackSignals.slice(0, count);
+}
+
+export function renderDeepDigestMarkdown(report) {
+  const verdictLines = report.sections.todayVerdict.map((item, index) => `${index + 1}. ${item}`);
+  const argumentLines = report.sections.coreArguments.flatMap((argument) => {
+    const citationLines = argument.citations.map((citation) => `- ${citation.label}：${citation.url}`);
+    return [
+      `### ${argument.title}`,
+      '',
+      ...argument.paragraphs,
+      '',
+      '证据链接：',
+      ...citationLines,
+      ''
+    ];
+  });
+  const counterpointLines = report.sections.counterpoints.map((item, index) => `${index + 1}. ${item}`);
+  const actionLines = report.sections.actionItems.flatMap((item) => [
+    `### ${item.title}`,
+    '',
+    ...item.paragraphs,
+    ''
+  ]);
+  const readNextLines = report.sections.readNext.map((item, index) => `${index + 1}. ${item.label}：${item.url}`);
+
+  return [
+    `# ${report.title}`,
+    '',
+    report.intro,
+    '',
+    '## 今日结论',
+    ...verdictLines,
+    '',
+    '## 核心论证',
+    ...argumentLines,
+    '## 反论点与不确定性',
+    ...counterpointLines,
+    '',
+    '## 创始人行动建议',
+    ...actionLines,
+    '## 延伸阅读',
+    ...readNextLines,
+    ''
+  ].join('\n');
 }

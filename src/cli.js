@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 
-import { buildFounderRadar } from './radar/build-founder-radar.js';
+import { createOpenAiCompatibleClient } from './llm/openai-compatible-client.js';
+import { createLarkClient, renderDigestPostMessages } from './lark/client.js';
+import { buildDeepFounderRadarReport } from './radar/build-founder-radar.js';
 
 const FEED_BASE_URL = process.env.FOLLOW_BUILDERS_FEED_BASE_URL
   || 'https://raw.githubusercontent.com/zarazhangrui/follow-builders/main';
@@ -12,27 +14,47 @@ async function main() {
     const fixtureInput = JSON.parse(
       await readFile(new URL('../test/fixtures/smoke-bundle.json', import.meta.url), 'utf-8')
     );
-    const report = buildFounderRadar(fixtureInput, {
-      language: 'zh-CN',
-      style: 'verdict+evidence',
-      delivery: 'lark_dm'
+    const report = buildDeepFounderRadarReport(fixtureInput, {
+      language: process.env.FOUNDER_RADAR_LANGUAGE || 'zh-CN'
     });
     process.stdout.write(report.markdown);
     return;
   }
 
-  if (command !== 'run') {
+  if (!['run', 'deliver'].includes(command)) {
     throw new Error(`Unsupported command: ${command}`);
   }
 
   const bundle = await fetchFeedBundle();
-  const report = buildFounderRadar(bundle, {
-    language: process.env.FOUNDER_RADAR_LANGUAGE || 'zh-CN',
-    style: 'verdict+evidence',
-    delivery: 'lark_dm'
+  const fallbackReport = buildDeepFounderRadarReport(bundle, {
+    language: process.env.FOUNDER_RADAR_LANGUAGE || 'zh-CN'
+  });
+  const llmClient = createOpenAiCompatibleClient();
+  const report = await llmClient.enrichDigestReport(fallbackReport);
+
+  if (command === 'run') {
+    process.stdout.write(report.markdown);
+    return;
+  }
+
+  const client = createLarkClient({
+    appId: process.env.LARK_APP_ID,
+    appSecret: process.env.LARK_APP_SECRET,
+    baseUrl: process.env.LARK_BASE_URL
+  });
+  const messages = renderDigestPostMessages(report);
+  const receiveId = process.env.LARK_RECIPIENT_OPEN_ID;
+
+  if (!receiveId) {
+    throw new Error('LARK_RECIPIENT_OPEN_ID is required for deliver');
+  }
+
+  const result = await client.sendPosts({
+    receiveId,
+    messages
   });
 
-  process.stdout.write(report.markdown);
+  process.stdout.write(`sent ${result.sent} rich message(s) to ${receiveId}\n`);
 }
 
 async function fetchFeedBundle() {

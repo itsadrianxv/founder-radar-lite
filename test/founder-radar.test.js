@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildFounderRadar } from '../src/radar/build-founder-radar.js';
+import { buildDeepFounderRadarReport, buildFounderRadar } from '../src/radar/build-founder-radar.js';
 
 const baseInput = {
   generatedAt: '2026-04-01T07:18:03.375Z',
@@ -235,4 +235,21 @@ test('is deterministic across repeated runs of the same feed bundle', () => {
   });
 
   assert.deepEqual(second, first);
+});
+
+test('builds a long-form Chinese digest with fixed sections and source links', () => {
+  const result = buildDeepFounderRadarReport(baseInput, {
+    language: 'zh-CN'
+  });
+
+  assert.match(result.markdown, /# Founder Radar 深度日报/);
+  assert.match(result.markdown, /## 今日结论/);
+  assert.match(result.markdown, /## 核心论证/);
+  assert.match(result.markdown, /## 反论点与不确定性/);
+  assert.match(result.markdown, /## 创始人行动建议/);
+  assert.match(result.markdown, /## 延伸阅读/);
+  assert.ok(result.markdown.length > 1800);
+  assert.match(result.markdown, /https:\/\/x\.com\/kevinweil\/status\/2/);
+  assert.equal(result.markdown.includes('## Top Signals'), false);
+  assert.equal(result.markdown.includes('## Who to Watch'), false);
 });

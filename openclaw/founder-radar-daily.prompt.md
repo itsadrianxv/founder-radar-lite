@@ -1,15 +1,13 @@
 Use the `founder-radar` skill from this repository.
 
-Run the deterministic report generator:
+Run the delivery entrypoint:
 
 ```bash
-node src/cli.js run
+node src/cli.js deliver
 ```
 
-Deliver the resulting Markdown exactly as-is.
-
 Rules:
-- Do not add extra introduction or explanation
 - Do not browse the web
 - Do not invent any links or facts
-- If the command fails, report the failure reason briefly
+- Do not paste the full report body back into the channel
+- Only report whether delivery succeeded, and include the failure reason briefly if it failed

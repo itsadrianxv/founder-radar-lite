@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [string[]]$Services = @('founder_radar_smoke'),
-  [string[]]$RequiredEnv = @('FOLLOW_BUILDERS_FEED_BASE_URL', 'FOUNDER_RADAR_LANGUAGE', 'LARK_DOMAIN')
+  [string[]]$RequiredEnv = @('FOLLOW_BUILDERS_FEED_BASE_URL', 'FOUNDER_RADAR_LANGUAGE', 'FOUNDER_RADAR_LLM_BASE_URL', 'FOUNDER_RADAR_LLM_API_KEY', 'FOUNDER_RADAR_LLM_MODEL', 'LARK_APP_ID', 'LARK_APP_SECRET', 'LARK_RECIPIENT_OPEN_ID')
 )
 
 $ErrorActionPreference = 'Stop'
