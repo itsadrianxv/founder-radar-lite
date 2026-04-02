@@ -1,18 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
-test('deploy-main script parses as valid PowerShell', async () => {
+test('deploy-main script parses as valid PowerShell', async (t) => {
+  const shell = resolvePowerShellExecutable();
+  if (!shell) {
+    t.skip('PowerShell is not installed on this platform');
+  }
+
   const result = await runPowerShell(
+    shell,
     "[ScriptBlock]::Create((Get-Content -Raw 'deploy/deploy-main.ps1')) | Out-Null"
   );
 
   assert.equal(result.code, 0, result.stderr);
 });
 
-function runPowerShell(command) {
+function resolvePowerShellExecutable() {
+  for (const candidate of ['pwsh', 'powershell']) {
+    const result = spawnSync(candidate, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], {
+      stdio: 'ignore'
+    });
+
+    if (!result.error && result.status === 0) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function runPowerShell(shell, command) {
   return new Promise((resolve) => {
-    const child = spawn('powershell', ['-NoProfile', '-Command', command], {
+    const child = spawn(shell, ['-NoProfile', '-Command', command], {
       cwd: process.cwd(),
       stdio: ['ignore', 'pipe', 'pipe']
     });
