@@ -1,13 +1,13 @@
-import {
-  CORE_BLOG_SOURCES,
-  CORE_PODCAST_SOURCES,
-  CORE_X_SOURCES
-} from '../config/core-sources.js';
-
 const SOURCE_PRIORITY = {
   x: 3,
   blog: 2,
   podcast: 1
+};
+
+const CANDIDATE_BASE_WEIGHT = {
+  x: 8,
+  blog: 8,
+  podcast: 7
 };
 
 const THEME_RULES = [
@@ -21,19 +21,22 @@ export function buildFounderRadar(input, options = {}) {
   const normalizedOptions = {
     language: options.language || 'zh-CN',
     style: options.style || 'verdict+evidence',
-    delivery: options.delivery || 'lark_dm'
+    delivery: options.delivery || 'lark_dm',
+    pruning: normalizePruningOptions(options.pruning)
   };
 
   const candidates = collectCandidates(input);
-  const scoredSignals = candidates
+  const scoredSignals = applyPruningFilters(candidates, normalizedOptions.pruning)
     .map((candidate) => ({ ...candidate, score: scoreCandidate(candidate) }))
     .sort(compareSignals);
+  const limitedSignals = applyPerTypeCandidateMax(scoredSignals, normalizedOptions.pruning.max)
+    .sort(compareSignals);
 
-  const topSignals = scoredSignals.slice(0, 5);
-  const whoToWatch = buildWhoToWatch(scoredSignals);
+  const topSignals = limitedSignals.slice(0, 5);
+  const whoToWatch = buildWhoToWatch(limitedSignals);
   const opportunities = buildOpportunitySeeds(topSignals, whoToWatch);
   const verdicts = buildVerdicts(topSignals);
-  const readNext = buildReadNext(topSignals, scoredSignals);
+  const readNext = buildReadNext(topSignals, limitedSignals);
   const markdown = renderMarkdown({
     generatedAt: input.generatedAt,
     verdicts,
@@ -81,17 +84,104 @@ export function buildDeepFounderRadarReport(input, options = {}) {
   };
 }
 
+function normalizePruningOptions(pruning = {}) {
+  return {
+    x: {
+      includeHandles: normalizeHandleList(pruning.x?.includeHandles),
+      excludeHandles: normalizeHandleList(pruning.x?.excludeHandles)
+    },
+    blog: {
+      includeSources: normalizeStringList(pruning.blog?.includeSources),
+      excludeSources: normalizeStringList(pruning.blog?.excludeSources)
+    },
+    podcast: {
+      includeSources: normalizeStringList(pruning.podcast?.includeSources),
+      excludeSources: normalizeStringList(pruning.podcast?.excludeSources)
+    },
+    max: {
+      xCandidates: normalizeMaxCount(pruning.max?.xCandidates),
+      blogCandidates: normalizeMaxCount(pruning.max?.blogCandidates),
+      podcastCandidates: normalizeMaxCount(pruning.max?.podcastCandidates)
+    }
+  };
+}
+
+function normalizeStringList(values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+}
+
+function normalizeHandleList(values) {
+  return normalizeStringList(values).map((value) => value.toLowerCase());
+}
+
+function normalizeMaxCount(value) {
+  if (!Number.isInteger(value) || value <= 0) {
+    return null;
+  }
+
+  return value;
+}
+
+function applyPruningFilters(candidates, pruning) {
+  return candidates.filter((candidate) => shouldKeepCandidate(candidate, pruning));
+}
+
+function shouldKeepCandidate(candidate, pruning) {
+  if (candidate.type === 'x') {
+    const handle = String(candidate.handle || '').toLowerCase();
+    const excluded = pruning.x.excludeHandles.includes(handle);
+    if (excluded) return false;
+    if (pruning.x.includeHandles.length === 0) return true;
+    return pruning.x.includeHandles.includes(handle);
+  }
+
+  if (candidate.type === 'blog') {
+    const sourceName = String(candidate.sourceName || '').trim();
+    const excluded = pruning.blog.excludeSources.includes(sourceName);
+    if (excluded) return false;
+    if (pruning.blog.includeSources.length === 0) return true;
+    return pruning.blog.includeSources.includes(sourceName);
+  }
+
+  if (candidate.type === 'podcast') {
+    const sourceName = String(candidate.sourceName || '').trim();
+    const excluded = pruning.podcast.excludeSources.includes(sourceName);
+    if (excluded) return false;
+    if (pruning.podcast.includeSources.length === 0) return true;
+    return pruning.podcast.includeSources.includes(sourceName);
+  }
+
+  return true;
+}
+
+function applyPerTypeCandidateMax(scoredSignals, maxByType) {
+  const xSignals = scoredSignals.filter((signal) => signal.type === 'x');
+  const blogSignals = scoredSignals.filter((signal) => signal.type === 'blog');
+  const podcastSignals = scoredSignals.filter((signal) => signal.type === 'podcast');
+
+  const limitedXSignals = maxByType.xCandidates ? xSignals.slice(0, maxByType.xCandidates) : xSignals;
+  const limitedBlogSignals = maxByType.blogCandidates ? blogSignals.slice(0, maxByType.blogCandidates) : blogSignals;
+  const limitedPodcastSignals = maxByType.podcastCandidates ? podcastSignals.slice(0, maxByType.podcastCandidates) : podcastSignals;
+
+  return [...limitedXSignals, ...limitedBlogSignals, ...limitedPodcastSignals];
+}
+
 function collectCandidates(input) {
   const groupedAccounts = new Map();
   for (const account of input.x || []) {
-    if (!Object.hasOwn(CORE_X_SOURCES, account.handle)) continue;
-    const current = groupedAccounts.get(account.handle) || {
-      sourceName: account.name,
-      handle: account.handle,
+    const normalizedHandle = String(account.handle || '').trim().toLowerCase();
+    const sourceName = String(account.name || normalizedHandle || 'Unknown X Source').trim();
+    const accountKey = normalizedHandle || sourceName;
+    const current = groupedAccounts.get(accountKey) || {
+      sourceName,
+      handle: normalizedHandle || null,
       tweets: []
     };
     current.tweets.push(...(account.tweets || []));
-    groupedAccounts.set(account.handle, current);
+    groupedAccounts.set(accountKey, current);
   }
 
   const xCandidates = [...groupedAccounts.values()].map((account) => {
@@ -101,7 +191,8 @@ function collectCandidates(input) {
       return rightScore - leftScore || String(right.createdAt).localeCompare(String(left.createdAt));
     });
     const leadTweet = rankedTweets[0];
-    const combinedText = rankedTweets.map((tweet) => tweet.text).join(' ');
+    if (!leadTweet) return null;
+    const combinedText = rankedTweets.map((tweet) => String(tweet.text || '')).join(' ').trim();
 
     return {
       type: 'x',
@@ -112,7 +203,7 @@ function collectCandidates(input) {
       evidence: summarizeText(combinedText, 140),
       url: leadTweet.url,
       publishedAt: leadTweet.createdAt,
-      weight: CORE_X_SOURCES[account.handle],
+      weight: CANDIDATE_BASE_WEIGHT.x,
       themeTags: inferThemeTags(combinedText),
       engagement: rankedTweets.reduce(
         (sum, tweet) => sum + (tweet.likes || 0) + (tweet.retweets || 0) * 2 + (tweet.replies || 0),
@@ -120,22 +211,22 @@ function collectCandidates(input) {
       ),
       rawText: combinedText
     };
-  });
+  }).filter(Boolean);
 
   const blogCandidates = (input.blogs || [])
-    .filter((blog) => CORE_BLOG_SOURCES.has(blog.name))
     .map((blog) => {
+      const sourceName = String(blog.name || 'Unknown Blog').trim();
       const text = `${blog.title} ${blog.description || ''} ${blog.content || ''}`.trim();
       return {
         type: 'blog',
-        sourceName: blog.name,
+        sourceName,
         handle: null,
         title: blog.title,
         summary: summarizeText(text, 180),
         evidence: summarizeText(blog.content || blog.description || blog.title, 140),
         url: blog.url,
         publishedAt: blog.publishedAt,
-        weight: blog.name === 'Anthropic Engineering' ? 9 : 8,
+        weight: CANDIDATE_BASE_WEIGHT.blog,
         themeTags: inferThemeTags(text),
         engagement: 40,
         rawText: text
@@ -143,19 +234,19 @@ function collectCandidates(input) {
     });
 
   const podcastCandidates = (input.podcasts || [])
-    .filter((podcast) => CORE_PODCAST_SOURCES.has(podcast.name))
     .map((podcast) => {
+      const sourceName = String(podcast.name || 'Unknown Podcast').trim();
       const text = `${podcast.title} ${podcast.transcript || ''}`.trim();
       return {
         type: 'podcast',
-        sourceName: podcast.name,
+        sourceName,
         handle: null,
         title: podcast.title,
         summary: summarizeText(text, 180),
         evidence: summarizeText(podcast.transcript || podcast.title, 140),
         url: podcast.url,
         publishedAt: podcast.publishedAt,
-        weight: podcast.name === 'Latent Space' ? 8 : 7,
+        weight: CANDIDATE_BASE_WEIGHT.podcast,
         themeTags: inferThemeTags(text),
         engagement: 25,
         rawText: text

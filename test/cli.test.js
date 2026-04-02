@@ -35,6 +35,25 @@ test('run command fetches feeds and renders the model-backed long digest', async
   }
 });
 
+test('run command fails fast when prune max env is not an integer', async () => {
+  const server = createFixtureServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const result = await runCli(['run'], {
+      FOLLOW_BUILDERS_FEED_BASE_URL: baseUrl,
+      FOUNDER_RADAR_PRUNE_MAX_X_CANDIDATES: '1.5'
+    });
+
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /FOUNDER_RADAR_PRUNE_MAX_X_CANDIDATES/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test('deliver command sends rich Feishu posts instead of raw markdown text', async () => {
   const appServer = createFixtureServer();
   const larkTraffic = [];

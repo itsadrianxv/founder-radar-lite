@@ -22,6 +22,23 @@ export LARK_RECIPIENT_OPEN_ID="ou_your_open_id"
 export LARK_BASE_URL="https://open.larksuite.com"
 ```
 
+可选（来源裁剪策略，默认是全量来源不过滤）：
+
+```bash
+# 逗号分隔；include 为空表示不过滤；exclude 优先级更高
+export FOUNDER_RADAR_PRUNE_X_INCLUDE_HANDLES=""
+export FOUNDER_RADAR_PRUNE_X_EXCLUDE_HANDLES=""
+export FOUNDER_RADAR_PRUNE_BLOG_INCLUDE_SOURCES=""
+export FOUNDER_RADAR_PRUNE_BLOG_EXCLUDE_SOURCES=""
+export FOUNDER_RADAR_PRUNE_PODCAST_INCLUDE_SOURCES=""
+export FOUNDER_RADAR_PRUNE_PODCAST_EXCLUDE_SOURCES=""
+
+# 未设置或 <=0 表示不限；非整数会报错退出
+export FOUNDER_RADAR_PRUNE_MAX_X_CANDIDATES=""
+export FOUNDER_RADAR_PRUNE_MAX_BLOG_CANDIDATES=""
+export FOUNDER_RADAR_PRUNE_MAX_PODCAST_CANDIDATES=""
+```
+
 ## 手动验证
 
 ```bash

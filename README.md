@@ -4,7 +4,7 @@
 
 当前版本的定位很明确：
 
-- 用仓库脚本抓取和筛选 `follow-builders` 的核心信号
+- 用仓库脚本抓取 `follow-builders` 全量信号，并按可配置策略裁剪
 - 生成一份中文、长篇、判断型的 Founder Radar 深度日报
 - 把日报分成 3–5 条飞书富文本消息发送出去
 - 由阿里云服务器上的 `OpenClaw` 负责定时调度，不再让 `OpenClaw` 直接转发原始 Markdown 正文
@@ -22,8 +22,8 @@
 
 ## 当前能力
 
-- 核心输入源仍然只有 `follow-builders`
-- 保留核心信源过滤：指定 X 账号、`Claude Blog` / `Anthropic Engineering`、`Latent Space` / `No Priors`
+- 默认使用 `follow-builders` 的全量输入（X / blogs / podcasts）
+- 支持按环境变量裁剪来源：X 账号 include/exclude、博客/播客来源 include/exclude、每类 TopN 上限
 - 默认输出结构：`今日结论`、`核心论证`、`反论点与不确定性`、`创始人行动建议`、`延伸阅读`
 - 支持 `OpenAI` 兼容接口，默认可接 `DeepSeek Reasoner`
 - 默认发送飞书富文本，不再把 Markdown 当纯文本硬发
@@ -62,6 +62,23 @@ LARK_RECIPIENT_OPEN_ID=ou_your_open_id
 
 ```bash
 LARK_BASE_URL=https://open.larksuite.com
+```
+
+可选（裁剪策略）：
+
+```bash
+# 逗号分隔；include 为空表示不过滤；exclude 优先级更高
+FOUNDER_RADAR_PRUNE_X_INCLUDE_HANDLES=
+FOUNDER_RADAR_PRUNE_X_EXCLUDE_HANDLES=
+FOUNDER_RADAR_PRUNE_BLOG_INCLUDE_SOURCES=
+FOUNDER_RADAR_PRUNE_BLOG_EXCLUDE_SOURCES=
+FOUNDER_RADAR_PRUNE_PODCAST_INCLUDE_SOURCES=
+FOUNDER_RADAR_PRUNE_PODCAST_EXCLUDE_SOURCES=
+
+# 未设置或 <=0 表示不限；非整数会直接报错退出
+FOUNDER_RADAR_PRUNE_MAX_X_CANDIDATES=
+FOUNDER_RADAR_PRUNE_MAX_BLOG_CANDIDATES=
+FOUNDER_RADAR_PRUNE_MAX_PODCAST_CANDIDATES=
 ```
 
 ## 本地与服务器验证

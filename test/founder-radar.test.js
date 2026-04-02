@@ -86,11 +86,11 @@ const baseInput = {
       source: 'x',
       name: 'Peter Yang',
       handle: 'petergyang',
-      bio: 'excluded from the founder radar core set',
+      bio: 'high-signal non-core source',
       tweets: [
         {
           id: '5',
-          text: 'This should never appear because the core source filter excludes me.',
+          text: 'Shipping practical agent workflows with strong distribution and growth loops.',
           createdAt: '2026-04-01T04:00:00.000Z',
           url: 'https://x.com/petergyang/status/5',
           likes: 999,
@@ -114,10 +114,10 @@ const baseInput = {
     {
       source: 'podcast',
       name: 'Unsupervised Learning',
-      title: 'This should be filtered out',
+      title: 'Agent reliability deep dive',
       url: 'https://youtube.com/watch?v=unsupervised',
       publishedAt: '2026-03-31T00:00:00.000Z',
-      transcript: 'Not in the founder radar core set.'
+      transcript: 'Agent reliability needs review loops and better operational workflows.'
     }
   ],
   blogs: [
@@ -134,12 +134,12 @@ const baseInput = {
     {
       source: 'blog',
       name: 'Random Blog',
-      title: 'This should be filtered out',
+      title: 'Startup teams shipping with tiny headcount',
       url: 'https://example.com/random',
       publishedAt: '2026-04-01T01:00:00.000Z',
       author: 'Unknown',
-      description: 'Filtered',
-      content: 'Not in the approved core set.'
+      description: 'High-signal outsider source',
+      content: 'Small teams now ship end-to-end agent workflows with explicit review and launch playbooks.'
     }
   ]
 };
@@ -164,17 +164,68 @@ test('renders the fixed founder radar sections with evidence links', () => {
   }
 });
 
-test('keeps only the approved core source subset', () => {
+test('keeps all sources by default when pruning is not configured', () => {
   const result = buildFounderRadar(baseInput, {
     language: 'zh-CN',
     style: 'verdict+evidence',
     delivery: 'lark_dm'
   });
 
+  assert.equal(result.sections.topSignals.some((signal) => signal.handle === 'petergyang'), true);
+  assert.equal(result.markdown.includes('petergyang'), true);
+});
+
+test('supports include and exclude pruning where exclude takes precedence', () => {
+  const result = buildFounderRadar(baseInput, {
+    language: 'zh-CN',
+    style: 'verdict+evidence',
+    delivery: 'lark_dm',
+    pruning: {
+      x: {
+        includeHandles: ['petergyang', 'kevinweil'],
+        excludeHandles: ['petergyang']
+      },
+      blog: {
+        includeSources: ['Random Blog', 'Claude Blog'],
+        excludeSources: ['Random Blog']
+      },
+      podcast: {
+        includeSources: ['Unsupervised Learning', 'Latent Space'],
+        excludeSources: ['Unsupervised Learning']
+      }
+    }
+  });
+
   assert.equal(result.sections.topSignals.some((signal) => signal.handle === 'petergyang'), false);
+  assert.equal(result.sections.topSignals.some((signal) => signal.sourceName === 'Random Blog'), false);
+  assert.equal(result.sections.topSignals.some((signal) => signal.sourceName === 'Unsupervised Learning'), false);
   assert.equal(result.markdown.includes('petergyang'), false);
-  assert.equal(result.markdown.includes('Unsupervised Learning'), false);
   assert.equal(result.markdown.includes('Random Blog'), false);
+  assert.equal(result.markdown.includes('Unsupervised Learning'), false);
+});
+
+test('applies per-type max candidate pruning after scoring', () => {
+  const result = buildFounderRadar(baseInput, {
+    language: 'zh-CN',
+    style: 'verdict+evidence',
+    delivery: 'lark_dm',
+    pruning: {
+      max: {
+        xCandidates: 1,
+        blogCandidates: 1,
+        podcastCandidates: 1
+      }
+    }
+  });
+
+  const countsByType = result.sections.topSignals.reduce((counts, signal) => {
+    counts[signal.type] = (counts[signal.type] || 0) + 1;
+    return counts;
+  }, {});
+
+  assert.equal(countsByType.x || 0, 1);
+  assert.equal(countsByType.blog || 0, 1);
+  assert.equal(countsByType.podcast || 0, 1);
 });
 
 test('still renders cleanly when podcasts and blogs are empty', () => {
@@ -185,7 +236,7 @@ test('still renders cleanly when podcasts and blogs are empty', () => {
 
   assert.match(result.markdown, /## Opportunity Seeds/);
   assert.match(result.markdown, /## Read Next/);
-  assert.equal(result.sections.topSignals.length, 4);
+  assert.equal(result.sections.topSignals.length, 5);
 });
 
 test('collapses repeated tweets from the same builder into one signal', () => {
@@ -249,7 +300,7 @@ test('builds a long-form Chinese digest with fixed sections and source links', (
   assert.match(result.markdown, /## 创始人行动建议/);
   assert.match(result.markdown, /## 延伸阅读/);
   assert.ok(result.markdown.length > 1800);
-  assert.match(result.markdown, /https:\/\/x\.com\/kevinweil\/status\/2/);
+  assert.match(result.markdown, /https:\/\/x\.com\/.+\/status\/\d+/);
   assert.equal(result.markdown.includes('## Top Signals'), false);
   assert.equal(result.markdown.includes('## Who to Watch'), false);
 });
