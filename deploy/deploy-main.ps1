@@ -46,7 +46,7 @@ Get-Content $envFile | ForEach-Object {
 
 foreach ($name in $RequiredEnv) {
   if (-not $envMap.ContainsKey($name) -or [string]::IsNullOrWhiteSpace($envMap[$name])) {
-    throw "Required env missing from $envFile: $name"
+    throw "Required env missing from ${envFile}: $name"
   }
 }
 
@@ -70,7 +70,7 @@ foreach ($service in $Services) {
   foreach ($name in $RequiredEnv) {
     $value = docker exec $containerId /bin/sh -lc "printenv $name"
     if ([string]::IsNullOrWhiteSpace($value)) {
-      throw "Container env check failed for $service: $name"
+      throw "Container env check failed for ${service}: $name"
     }
   }
 }
