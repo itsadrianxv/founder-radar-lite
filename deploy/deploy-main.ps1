@@ -6,6 +6,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$Services = @($Services | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$RequiredEnv = @($RequiredEnv | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+
 function Resolve-RepoRoot {
   $gitCommonDir = git -C $PSScriptRoot rev-parse --path-format=absolute --git-common-dir 2>$null
   if (-not $gitCommonDir) {
