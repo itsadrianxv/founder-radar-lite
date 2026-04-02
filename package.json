@@ -1,0 +1,11 @@
+{
+  "name": "ai-builders-sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "radar:run": "node src/cli.js run",
+    "radar:smoke": "node src/cli.js smoke"
+  }
+}

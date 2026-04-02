@@ -1,0 +1,13 @@
+services:
+  founder_radar_smoke:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      FOLLOW_BUILDERS_FEED_BASE_URL: ${FOLLOW_BUILDERS_FEED_BASE_URL}
+      FOUNDER_RADAR_LANGUAGE: ${FOUNDER_RADAR_LANGUAGE}
+      LARK_DOMAIN: ${LARK_DOMAIN}
+    command:
+      - /bin/sh
+      - -lc
+      - node src/cli.js smoke > /tmp/founder-radar.md && tail -f /dev/null

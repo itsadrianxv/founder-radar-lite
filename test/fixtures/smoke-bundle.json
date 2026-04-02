@@ -1,0 +1,65 @@
+{
+  "generatedAt": "2026-04-01T07:18:03.375Z",
+  "x": [
+    {
+      "source": "x",
+      "name": "Kevin Weil",
+      "handle": "kevinweil",
+      "bio": "VP Science @OpenAI",
+      "tweets": [
+        {
+          "id": "2",
+          "text": "AI is solving more open problems and the proofs are getting more elegant.",
+          "createdAt": "2026-04-01T04:38:05.000Z",
+          "url": "https://x.com/kevinweil/status/2",
+          "likes": 116,
+          "retweets": 7,
+          "replies": 18,
+          "isQuote": true,
+          "quotedTweetId": "22"
+        }
+      ]
+    },
+    {
+      "source": "x",
+      "name": "Amjad Masad",
+      "handle": "amasad",
+      "bio": "CEO @replit",
+      "tweets": [
+        {
+          "id": "3",
+          "text": "New psyop just dropped around agentic coding workflows.",
+          "createdAt": "2026-04-01T04:12:59.000Z",
+          "url": "https://x.com/amasad/status/3",
+          "likes": 259,
+          "retweets": 29,
+          "replies": 26,
+          "isQuote": true,
+          "quotedTweetId": "33"
+        }
+      ]
+    }
+  ],
+  "podcasts": [
+    {
+      "source": "podcast",
+      "name": "Latent Space",
+      "title": "Why agents keep failing and what tool curation fixes",
+      "url": "https://youtube.com/watch?v=latent-space",
+      "publishedAt": "2026-03-31T00:00:00.000Z",
+      "transcript": "Tool selection accuracy drops when agents have too many tools. Better tool curation wins."
+    }
+  ],
+  "blogs": [
+    {
+      "source": "blog",
+      "name": "Claude Blog",
+      "title": "Claude ships a faster agent workflow",
+      "url": "https://claude.com/blog/faster-agent-workflow",
+      "publishedAt": "2026-04-01T01:00:00.000Z",
+      "author": "Anthropic",
+      "description": "Workflow update",
+      "content": "Claude ships a faster agent workflow with better tool use and more reliable reviews."
+    }
+  ]
+}
