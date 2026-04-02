@@ -5,6 +5,8 @@
 
 Inspired by [follow-builders by zarazhangrui](https://github.com/zarazhangrui/follow-builders).
 
+Recommended production path: run `node src/cli.js run` locally on your server and deliver the result via the official Lark API. See `docs/direct-lark-api-setup.md`.
+
 ## 特性
 
 - 单次运行、无数据库、无长期 memory

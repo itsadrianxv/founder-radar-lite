@@ -6,6 +6,8 @@
   "scripts": {
     "test": "node --test",
     "radar:run": "node src/cli.js run",
-    "radar:smoke": "node src/cli.js smoke"
+    "radar:smoke": "node src/cli.js smoke",
+    "lark:send": "node src/send-lark.js",
+    "radar:run-and-send": "bash ./scripts/run-and-send.sh"
   }
 }
