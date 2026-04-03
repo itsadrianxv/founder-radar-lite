@@ -1,8 +1,17 @@
 # OpenClaw + Lark Setup
 
+> 这是可选调度方案。默认推荐使用 `crontab` 一键部署（`bash scripts/setup-server-cron.sh`）。
+
 ## 目标
 
 在阿里云服务器上常驻 `OpenClaw Gateway`，每天定时触发本仓库的 `deliver` 入口，由仓库脚本直接把深度日报发到你的飞书私聊。
+
+如果你更关注稳定性和最少审批交互，建议改用系统 `crontab`：
+
+```bash
+cd /home/admin/apps/founder-radar-lite
+bash scripts/setup-server-cron.sh
+```
 
 ## 标准链路
 

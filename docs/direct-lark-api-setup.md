@@ -3,6 +3,22 @@
 本文档描述的是 **仓库脚本负责飞书投递** 的那一段链路。
 推荐做法是：`OpenClaw` 负责定时触发，仓库内的 `node src/cli.js deliver` 负责生成并发送日报。
 
+## 一键部署（推荐）
+
+在服务器上执行：
+
+```bash
+cd /home/admin/apps/founder-radar-lite
+bash scripts/setup-server-cron.sh
+```
+
+该脚本会自动完成代码同步、依赖安装、`.env` 检查、crontab 写入和一次真实投递验证。
+执行日志默认落在：
+
+```bash
+/tmp/founder-radar-cron.log
+```
+
 ## 必需环境变量
 
 ```bash
@@ -73,4 +89,5 @@ node src/cli.js deliver
 
 - 如果 `run` 失败，优先看 feed 拉取与 `FOUNDER_RADAR_LLM_*` 配置
 - 如果 `deliver` 失败，优先看 Lark 凭据与 `LARK_RECIPIENT_OPEN_ID`
+- 如果出现 `LARK_APP_ID is required`，说明当前 shell 或 cron 没有正确加载 `.env`
 - 如果只是想验证仓库内的格式和分段逻辑，可先运行 `node src/cli.js smoke`

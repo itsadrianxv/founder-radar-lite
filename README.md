@@ -45,6 +45,30 @@ npm run radar:deliver
 - `node src/cli.js deliver`：抓取 feed、生成摘要并直接发送到飞书
 - `node src/send-lark.js`：底层飞书发送脚本，主要用于单独调试发送能力，不是标准生产入口
 
+## 一键服务器部署（首选）
+
+推荐在阿里云服务器使用一条命令完成更新、环境检查、crontab 配置和试跑投递：
+
+```bash
+cd /home/admin/apps/founder-radar-lite
+bash scripts/setup-server-cron.sh
+```
+
+也可以通过 npm 别名执行：
+
+```bash
+npm run server:setup-cron
+```
+
+脚本会自动完成：
+
+- `git fetch/pull` 同步到 `main`
+- 依赖安装（优先 `npm ci`，失败或无 lockfile 回退 `npm install`）
+- `.env` 缺失时从 `.env.example` 自动生成
+- 校验关键环境变量是否为空
+- 写入唯一 crontab：每天 09:00（Asia/Shanghai）执行 `scripts/run-and-send.sh`
+- 快速试跑一次 `deliver` 并输出结果摘要
+
 ## 环境变量
 
 ```bash
@@ -96,7 +120,9 @@ node src/cli.js deliver
 
 ## OpenClaw
 
-这个仓库现在仍然推荐与 `OpenClaw` 配合使用，但职责已经收敛成：
+`OpenClaw` 调度是可选方案。生产默认建议优先使用上面的 `crontab` 一键部署路径。
+
+如果继续使用 `OpenClaw`，职责收敛成：
 
 - `OpenClaw`：调度 + 状态回报
 - 本仓库：内容生成 + 飞书发送

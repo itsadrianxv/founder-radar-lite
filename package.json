@@ -8,6 +8,7 @@
     "radar:run": "node src/cli.js run",
     "radar:smoke": "node src/cli.js smoke",
     "radar:deliver": "node src/cli.js deliver",
+    "server:setup-cron": "bash ./scripts/setup-server-cron.sh",
     "lark:send": "node src/send-lark.js",
     "radar:run-and-send": "bash ./scripts/run-and-send.sh"
   }
