@@ -108,7 +108,7 @@ const baseInput = {
       name: 'Latent Space',
       title: 'Why agents keep failing and what tool curation fixes',
       url: 'https://youtube.com/watch?v=latent-space',
-      publishedAt: '2026-03-31T00:00:00.000Z',
+      publishedAt: '2026-04-01T00:00:00.000Z',
       transcript: 'Tool selection accuracy drops when agents have too many tools. Better tool curation wins.'
     },
     {
@@ -116,7 +116,7 @@ const baseInput = {
       name: 'Unsupervised Learning',
       title: 'Agent reliability deep dive',
       url: 'https://youtube.com/watch?v=unsupervised',
-      publishedAt: '2026-03-31T00:00:00.000Z',
+      publishedAt: '2026-04-01T00:00:00.000Z',
       transcript: 'Agent reliability needs review loops and better operational workflows.'
     }
   ],
@@ -347,6 +347,82 @@ test('drops stale podcast signals that fall outside the daily recency window', (
 
   assert.equal(result.sections.topSignals.some((signal) => signal.type === 'podcast'), false);
   assert.equal(result.sections.topSignals[0]?.handle, 'freshagent');
+});
+
+test('uses a 24 hour default recency window across x blogs and podcasts', () => {
+  const result = buildFounderRadar(
+    {
+      generatedAt: '2026-04-07T07:00:00.000Z',
+      x: [
+        buildAccount({
+          name: 'Fresh X',
+          handle: 'freshx',
+          text: 'Agent workflows are shipping into production with human review.',
+          createdAt: '2026-04-07T01:00:00.000Z',
+          likes: 120,
+          retweets: 10,
+          replies: 7
+        }),
+        buildAccount({
+          name: 'Old X',
+          handle: 'oldx',
+          text: 'Yesterday still matters but should fall out after twenty four hours.',
+          createdAt: '2026-04-06T06:00:00.000Z',
+          likes: 500,
+          retweets: 50,
+          replies: 40
+        })
+      ],
+      blogs: [
+        {
+          source: 'blog',
+          name: 'Fresh Blog',
+          title: 'Fresh launch note',
+          url: 'https://example.com/fresh-blog',
+          publishedAt: '2026-04-06T23:00:00.000Z',
+          author: 'Writer',
+          description: 'Fresh',
+          content: 'Product teams are launching with stronger workflows today.'
+        },
+        {
+          source: 'blog',
+          name: 'Old Blog',
+          title: 'Old launch note',
+          url: 'https://example.com/old-blog',
+          publishedAt: '2026-04-06T05:59:00.000Z',
+          author: 'Writer',
+          description: 'Old',
+          content: 'This blog is more than twenty four hours old and should be excluded.'
+        }
+      ],
+      podcasts: [
+        {
+          source: 'podcast',
+          name: 'Fresh Podcast',
+          title: 'Fresh podcast note',
+          url: 'https://example.com/fresh-podcast',
+          publishedAt: '2026-04-06T20:00:00.000Z',
+          transcript: 'Fresh signal about agent workflow delivery.'
+        },
+        {
+          source: 'podcast',
+          name: 'Old Podcast',
+          title: 'Old podcast note',
+          url: 'https://example.com/old-podcast',
+          publishedAt: '2026-04-06T04:30:00.000Z',
+          transcript: 'This transcript is older than twenty four hours and should not appear.'
+        }
+      ]
+    },
+    { language: 'zh-CN', style: 'verdict+evidence', delivery: 'lark_dm' }
+  );
+
+  assert.equal(result.sections.topSignals.some((signal) => signal.handle === 'oldx'), false);
+  assert.equal(result.sections.topSignals.some((signal) => signal.sourceName === 'Old Blog'), false);
+  assert.equal(result.sections.topSignals.some((signal) => signal.sourceName === 'Old Podcast'), false);
+  assert.equal(result.sections.topSignals.some((signal) => signal.handle === 'freshx'), true);
+  assert.equal(result.sections.topSignals.some((signal) => signal.sourceName === 'Fresh Blog'), true);
+  assert.equal(result.sections.topSignals.some((signal) => signal.sourceName === 'Fresh Podcast'), true);
 });
 
 test('uses theme-relevant evidence when expanding each daily verdict', () => {

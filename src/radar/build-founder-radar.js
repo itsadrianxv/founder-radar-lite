@@ -11,9 +11,9 @@ const CANDIDATE_BASE_WEIGHT = {
 };
 
 const MAX_SIGNAL_AGE_HOURS = {
-  x: 36,
-  blog: 72,
-  podcast: 72
+  x: 24,
+  blog: 24,
+  podcast: 24
 };
 
 const THEME_RULES = [
