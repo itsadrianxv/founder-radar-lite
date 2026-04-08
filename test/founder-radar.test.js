@@ -476,6 +476,53 @@ test('uses theme-relevant evidence when expanding each daily verdict', () => {
   assert.match(result.sections.todayVerdict[1], /Research Gamma \(@researchgamma\)/);
 });
 
+test('builds materially different verdicts for different daily signal mixes', () => {
+  const agentHeavy = buildFounderRadar(buildDailyBundle('agent-heavy'), {
+    language: 'zh-CN',
+    style: 'verdict+evidence',
+    delivery: 'lark_dm'
+  });
+  const researchHeavy = buildFounderRadar(buildDailyBundle('research-heavy'), {
+    language: 'zh-CN',
+    style: 'verdict+evidence',
+    delivery: 'lark_dm'
+  });
+  const distributionHeavy = buildFounderRadar(buildDailyBundle('distribution-heavy'), {
+    language: 'zh-CN',
+    style: 'verdict+evidence',
+    delivery: 'lark_dm'
+  });
+
+  const cannedAgentVerdict = 'Agent 工作流仍是今天最强的产品叙事，讨论重心集中在工具编排、自动化交付与效率放大。';
+  const cannedResearchVerdict = '前沿模型能力仍在向“更强问题求解 + 更优雅证明”延伸，研究进展正在反向抬升产品预期。';
+  const cannedTeamsVerdict = '小团队高杠杆创业继续强化：创始人和产品负责人都在默认接受“更少人做更多事”。';
+
+  assert.notDeepEqual(agentHeavy.sections.verdicts, researchHeavy.sections.verdicts);
+  assert.notDeepEqual(agentHeavy.sections.verdicts, distributionHeavy.sections.verdicts);
+  assert.notDeepEqual(researchHeavy.sections.verdicts, distributionHeavy.sections.verdicts);
+
+  assert.equal(agentHeavy.sections.verdicts.includes(cannedAgentVerdict), false);
+  assert.equal(researchHeavy.sections.verdicts.includes(cannedResearchVerdict), false);
+  assert.equal(distributionHeavy.sections.verdicts.includes(cannedTeamsVerdict), false);
+
+  assert.match(agentHeavy.sections.verdicts.join('\n'), /review|handoff|tooling|orchestration/i);
+  assert.match(researchHeavy.sections.verdicts.join('\n'), /proof|benchmark|evaluation|open problems/i);
+  assert.match(distributionHeavy.sections.verdicts.join('\n'), /launch|distribution|growth|pricing/i);
+});
+
+test('expands daily verdicts from narrative-specific evidence instead of a shared canned tail', () => {
+  const report = buildDeepFounderRadarReport(buildDailyBundle('mixed-narratives'), {
+    language: 'zh-CN'
+  });
+
+  assert.match(report.sections.todayVerdict[0], /Workflow Ops \(@workflowops\)|Review Rig \(@reviewrig\)/);
+  assert.match(report.sections.todayVerdict[1], /Proof Lab \(@prooflab\)|Eval Forge \(@evalforge\)/);
+  assert.match(report.sections.todayVerdict[2], /Launch Codes \(@launchcodes\)|Pricing Loop \(@pricingloop\)/);
+
+  assert.doesNotMatch(report.sections.todayVerdict[0], /Launch Codes \(@launchcodes\)/);
+  assert.doesNotMatch(report.sections.todayVerdict[1], /Workflow Ops \(@workflowops\)/);
+});
+
 function buildAccount({ name, handle, text, createdAt, likes, retweets, replies }) {
   return {
     source: 'x',
@@ -496,6 +543,136 @@ function buildAccount({ name, handle, text, createdAt, likes, retweets, replies 
       }
     ]
   };
+}
+
+function buildDailyBundle(kind) {
+  const generatedAt = '2026-04-07T07:00:00.000Z';
+
+  if (kind === 'agent-heavy') {
+    return {
+      generatedAt,
+      x: [
+        buildAccount({
+          name: 'Workflow Ops',
+          handle: 'workflowops',
+          text: 'Teams are standardizing agent review handoff tooling and orchestration around production code changes.',
+          createdAt: '2026-04-07T06:20:00.000Z',
+          likes: 280,
+          retweets: 22,
+          replies: 17
+        }),
+        buildAccount({
+          name: 'Review Rig',
+          handle: 'reviewrig',
+          text: 'The real moat is reliable code review loops, approval gates, and deployment handoff workflows for agents.',
+          createdAt: '2026-04-07T05:50:00.000Z',
+          likes: 240,
+          retweets: 20,
+          replies: 15
+        }),
+        buildAccount({
+          name: 'Ops Ledger',
+          handle: 'opsledger',
+          text: 'Agent automation only sticks when tooling makes rollback and audit trails cheap for the team.',
+          createdAt: '2026-04-07T05:05:00.000Z',
+          likes: 180,
+          retweets: 12,
+          replies: 9
+        })
+      ],
+      blogs: [],
+      podcasts: []
+    };
+  }
+
+  if (kind === 'research-heavy') {
+    return {
+      generatedAt,
+      x: [
+        buildAccount({
+          name: 'Proof Lab',
+          handle: 'prooflab',
+          text: 'Elegant proofs and model research are changing what product teams think should be solvable this quarter.',
+          createdAt: '2026-04-07T06:15:00.000Z',
+          likes: 300,
+          retweets: 25,
+          replies: 18
+        }),
+        buildAccount({
+          name: 'Eval Forge',
+          handle: 'evalforge',
+          text: 'Benchmark discipline and research evaluation are now the gating function for shipping frontier product claims.',
+          createdAt: '2026-04-07T05:40:00.000Z',
+          likes: 235,
+          retweets: 19,
+          replies: 14
+        }),
+        buildAccount({
+          name: 'Open Problems',
+          handle: 'openproblems',
+          text: 'Research teams are clearing open problems that were blocking applied reasoning products last month.',
+          createdAt: '2026-04-07T04:55:00.000Z',
+          likes: 170,
+          retweets: 11,
+          replies: 8
+        })
+      ],
+      blogs: [],
+      podcasts: []
+    };
+  }
+
+  if (kind === 'distribution-heavy') {
+    return {
+      generatedAt,
+      x: [
+        buildAccount({
+          name: 'Launch Codes',
+          handle: 'launchcodes',
+          text: 'AI products are now winning through launch timing, distribution systems, and sharper positioning.',
+          createdAt: '2026-04-07T06:10:00.000Z',
+          likes: 290,
+          retweets: 24,
+          replies: 19
+        }),
+        buildAccount({
+          name: 'Pricing Loop',
+          handle: 'pricingloop',
+          text: 'Growth and pricing iteration matter more than generic copilots once the launch window opens.',
+          createdAt: '2026-04-07T05:35:00.000Z',
+          likes: 230,
+          retweets: 18,
+          replies: 13
+        }),
+        buildAccount({
+          name: 'Founder GTM',
+          handle: 'foundergtm',
+          text: 'Founder-led distribution and product packaging are setting the pace for small-team revenue acceleration.',
+          createdAt: '2026-04-07T05:00:00.000Z',
+          likes: 180,
+          retweets: 13,
+          replies: 10
+        })
+      ],
+      blogs: [],
+      podcasts: []
+    };
+  }
+
+  if (kind === 'mixed-narratives') {
+    return {
+      generatedAt,
+      x: [
+        ...buildDailyBundle('agent-heavy').x.slice(0, 2),
+        ...buildDailyBundle('research-heavy').x.slice(0, 2),
+        ...buildDailyBundle('distribution-heavy').x.slice(0, 2)
+      ],
+      blogs: [],
+      podcasts: []
+    };
+  }
+
+  throw new Error(`Unknown bundle kind: ${kind}`);
 }
 
 function buildUniqueWordTranscript(size) {

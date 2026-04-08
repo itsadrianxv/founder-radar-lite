@@ -31,7 +31,7 @@ export function createOpenAiCompatibleClient({
           },
           {
             role: 'user',
-            content: buildDigestPrompt(fallbackReport)
+            content: buildSignalDigestPrompt(fallbackReport)
           }
         ]
       })
@@ -75,6 +75,68 @@ function buildDigestPrompt(fallbackReport) {
     '草稿正文：',
     fallbackReport.markdown
   ].join('\n');
+}
+
+function buildSignalDigestPrompt(fallbackReport) {
+  const topSignals = fallbackReport.brief?.sections?.topSignals || [];
+  const readNext = fallbackReport.sections?.readNext || [];
+
+  return [
+    '请根据下面的 raw daily signals，输出一份更有判断力的 20 分钟 Founder Radar 中文深度日报。',
+    '要求：',
+    '1. 只用中文写作，专有名词、英文 cue、链接除外。',
+    '2. 必须输出一个 JSON 对象，字段为 title、intro、sections。',
+    '3. sections 里必须有 todayVerdict、coreArguments、counterpoints、actionItems、readNext。',
+    '4. todayVerdict 必须有 3 条 materially different 的 signal-explicit 结论；不要复用固定三句模板，也不要把不同 source 压成同一套判断。',
+    '5. coreArguments、actionItems 要直接回应当天最强的 signals，而不是复述模板化叙事。',
+    '6. 不要删掉已有来源链接，不要新增 signal cards 里没有的事实。',
+    '',
+    'Report title seed:',
+    fallbackReport.title,
+    '',
+    'Report intro seed:',
+    fallbackReport.intro,
+    '',
+    'Top signal cards:',
+    formatTopSignalCards(topSignals),
+    '',
+    'Link inventory:',
+    formatLinkInventory(readNext)
+  ].join('\n');
+}
+
+function formatTopSignalCards(topSignals) {
+  if (!Array.isArray(topSignals) || topSignals.length === 0) {
+    return 'No top signals available.';
+  }
+
+  return topSignals.map((signal, index) => [
+    `${index + 1}. ${formatSignalActor(signal)}`,
+    `type: ${signal.type}`,
+    `summary: ${signal.summary}`,
+    `evidence: ${signal.evidence}`,
+    `themes: ${(signal.themeTags || []).join(', ')}`,
+    `url: ${signal.url}`
+  ].join('\n')).join('\n\n');
+}
+
+function formatLinkInventory(readNext) {
+  if (!Array.isArray(readNext) || readNext.length === 0) {
+    return 'No links.';
+  }
+
+  return readNext
+    .map((item, index) => {
+      if (typeof item === 'string') {
+        return `${index + 1}. ${item}`;
+      }
+      return `${index + 1}. ${item.label}: ${item.url}`;
+    })
+    .join('\n');
+}
+
+function formatSignalActor(signal) {
+  return signal.handle ? `${signal.sourceName} (@${signal.handle})` : signal.sourceName;
 }
 
 function extractJsonObject(content) {

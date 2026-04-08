@@ -23,6 +23,51 @@ const THEME_RULES = [
   { tag: 'distribution', keywords: ['growth', 'launch', 'ship', 'shipping', 'product'] }
 ];
 
+const NARRATIVE_THEME_ORDER = ['agents', 'research', 'distribution', 'teams'];
+
+const NARRATIVE_THEME_CONFIG = {
+  agents: {
+    cuePhrases: ['review', 'handoff', 'tooling', 'orchestration', 'workflow', 'approval', 'rollback', 'audit', 'automation', 'deployment', 'deploy'],
+    fallbackFocus: 'review、handoff、workflow orchestration',
+    verdictLead: '今天更扎实的 agent 信号，不在泛泛而谈“更聪明”，而在',
+    implication: '产品门槛已经从模型演示转向链路审阅、交付稳定性与可回滚性。',
+    argumentHeadline: '这些 workflow 节点正在成为 agent 产品的真实门槛',
+    actionTitle: '把这段 agent 链路拆成可审阅的默认动作'
+  },
+  research: {
+    cuePhrases: ['proof', 'proofs', 'benchmark', 'benchmarks', 'evaluation', 'eval', 'open problems', 'science', 'reasoning', 'research'],
+    fallbackFocus: 'proof、benchmark、evaluation',
+    verdictLead: '今天真正抬高产品预期的研究信号，集中在',
+    implication: '研究进展已经开始重写产品团队的验证门槛与用户预期。',
+    argumentHeadline: '研究进展正在直接传导到产品验证标准',
+    actionTitle: '把研究验证要求前置进发布流程'
+  },
+  distribution: {
+    cuePhrases: ['launch', 'distribution', 'growth', 'pricing', 'positioning', 'packaging', 'gtm', 'go-to-market', 'ship', 'shipping'],
+    fallbackFocus: 'launch、distribution、pricing',
+    verdictLead: '今天真正拉开差距的分发信号，落在',
+    implication: '竞争开始从“谁有模型”切到“谁更会 launch、package 与持续转化”。',
+    argumentHeadline: 'go-to-market 动作开始决定 AI 产品的复利速度',
+    actionTitle: '围绕分发动作重写 launch 与 packaging'
+  },
+  teams: {
+    cuePhrases: ['team', 'teams', 'founder', 'founders', 'startup', 'headcount', 'hiring', 'lean team', 'small team'],
+    fallbackFocus: 'team design、headcount、founder loops',
+    verdictLead: '今天的小团队高杠杆，不再是一句空泛口号，而是',
+    implication: '高杠杆正在从抽象效率叙事，落到具体组织分工、审阅边界与人员配置。',
+    argumentHeadline: '小团队高杠杆开始表现为具体组织动作',
+    actionTitle: '把高杠杆组织动作固化成团队默认规则'
+  }
+};
+
+const DISTINCTIVE_WORD_STOPLIST = new Set([
+  'about', 'after', 'agent', 'agents', 'around', 'because', 'being', 'better', 'build', 'builder', 'builders',
+  'changes', 'coding', 'company', 'continue', 'delivery', 'fewer', 'finally', 'founder', 'founders', 'growth',
+  'human', 'launch', 'model', 'models', 'people', 'product', 'products', 'proof', 'proofs', 'research',
+  'shipping', 'signal', 'signals', 'small', 'startup', 'teams', 'their', 'these', 'through', 'today', 'tool',
+  'tools', 'workflow', 'workflows'
+]);
+
 export function buildFounderRadar(input, options = {}) {
   const normalizedOptions = {
     language: options.language || 'zh-CN',
@@ -42,7 +87,7 @@ export function buildFounderRadar(input, options = {}) {
   const topSignals = limitedSignals.slice(0, 5);
   const whoToWatch = buildWhoToWatch(limitedSignals);
   const opportunities = buildOpportunitySeeds(topSignals, whoToWatch);
-  const verdictEntries = buildVerdictEntries(topSignals);
+  const verdictEntries = buildNarrativeVerdictEntries(topSignals);
   const verdicts = verdictEntries.map((entry) => entry.text);
   const readNext = buildReadNext(topSignals, limitedSignals);
   const markdown = renderMarkdown({
@@ -74,15 +119,15 @@ export function buildDeepFounderRadarReport(input, options = {}) {
   const topSignals = brief.sections.topSignals;
   const whoToWatch = brief.sections.whoToWatch;
   const opportunities = brief.sections.opportunities;
-  const verdictEntries = brief.sections.verdictEntries || buildVerdictEntries(topSignals);
+  const verdictEntries = brief.sections.verdictEntries || buildNarrativeVerdictEntries(topSignals);
   const report = {
     title: `Founder Radar 深度日报｜${dateLabel}`,
     intro: `这份深度日报继续以 follow-builders 为核心信号输入，只保留本仓库定义的高信号构建者与内容源。今天进入视野的重点，不是单条新闻本身，而是这些信号共同描出的组织、工作流与分发变化：构建者已经开始把模型能力从“能展示”推进到“能交付、能审核、能复盘”。`,
     sections: {
-      todayVerdict: verdictEntries.map((entry, index) => expandVerdict(entry, topSignals, opportunities[index])),
-      coreArguments: buildCoreArguments(topSignals),
+      todayVerdict: verdictEntries.map((entry, index) => expandNarrativeVerdict(entry, topSignals, opportunities[index])),
+      coreArguments: buildNarrativeCoreArguments(verdictEntries, topSignals),
       counterpoints: buildCounterpoints(topSignals),
-      actionItems: buildActionItems(opportunities, whoToWatch),
+      actionItems: buildNarrativeActionItems(verdictEntries, topSignals, opportunities, whoToWatch),
       readNext: buildReadNextLinks(topSignals, brief.sections.readNext)
     }
   };
@@ -455,6 +500,265 @@ function buildReadNext(topSignals, scoredSignals) {
     if (urls.length === 5) break;
   }
   return urls;
+}
+
+function buildNarrativeVerdictEntries(topSignals) {
+  const selectedCandidates = NARRATIVE_THEME_ORDER
+    .map((tag) => buildThemeNarrativeCandidate(topSignals, tag))
+    .filter((candidate) => candidate.score > 0)
+    .slice(0, 3);
+
+  const verdictEntries = selectedCandidates
+    .map((candidate) => createNarrativeVerdictEntry(candidate.tag, candidate.supportingSignals, candidate.cuePhrases));
+
+  let fallbackIndex = 0;
+  while (verdictEntries.length < 3 && fallbackIndex < topSignals.length) {
+    const fallbackCandidate = buildSignalNarrativeCandidate(topSignals[fallbackIndex]);
+    fallbackIndex += 1;
+    verdictEntries.push(
+      createNarrativeVerdictEntry(
+        fallbackCandidate.tag,
+        fallbackCandidate.supportingSignals,
+        fallbackCandidate.cuePhrases
+      )
+    );
+  }
+
+  while (verdictEntries.length < 3) {
+    verdictEntries.push(createNarrativeVerdictEntry('distribution', topSignals.slice(0, 2), []));
+  }
+
+  return verdictEntries.slice(0, 3);
+}
+
+function buildThemeNarrativeCandidate(topSignals, tag) {
+  const supportingSignals = topSignals
+    .map((signal, index) => {
+      const cuePhrases = findNarrativeCueHits(signal, tag);
+      const themeMatch = signal.themeTags.includes(tag);
+      if (cuePhrases.length === 0 && !themeMatch) {
+        return null;
+      }
+
+      return {
+        signal,
+        cuePhrases,
+        index,
+        weight: cuePhrases.length * 12 + (themeMatch ? 4 : 0) + ((signal.score || 0) / 10)
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.weight - left.weight || left.index - right.index);
+
+  return {
+    tag,
+    score: supportingSignals.reduce((sum, item) => sum + item.weight, 0),
+    supportingSignals: supportingSignals.slice(0, 2).map((item) => item.signal),
+    cuePhrases: uniqueStable(supportingSignals.flatMap((item) => item.cuePhrases)).slice(0, 3)
+  };
+}
+
+function compareNarrativeCandidates(left, right) {
+  return (
+    right.score - left.score ||
+    right.supportingSignals.length - left.supportingSignals.length ||
+    NARRATIVE_THEME_ORDER.indexOf(left.tag) - NARRATIVE_THEME_ORDER.indexOf(right.tag)
+  );
+}
+
+function buildSignalNarrativeCandidate(signal) {
+  const tag = pickNarrativeThemeForSignal(signal);
+  return {
+    tag,
+    supportingSignals: [signal],
+    cuePhrases: findNarrativeCueHits(signal, tag).slice(0, 3)
+  };
+}
+
+function createNarrativeVerdictEntry(tag, supportingSignals, cuePhrases) {
+  const normalizedSignals = supportingSignals.length > 0 ? supportingSignals : [];
+  const focus = buildNarrativeFocus(tag, cuePhrases, normalizedSignals);
+  return {
+    tag,
+    text: buildNarrativeText(tag, focus),
+    focus,
+    cuePhrases: cuePhrases.length > 0 ? cuePhrases : extractDistinctiveTerms(normalizedSignals, tag).slice(0, 3),
+    supportingSignalUrls: normalizedSignals.map((signal) => signal.url)
+  };
+}
+
+function buildNarrativeText(tag, focus) {
+  const config = NARRATIVE_THEME_CONFIG[tag] || NARRATIVE_THEME_CONFIG.distribution;
+  return `${config.verdictLead} ${focus} 这些动作。${config.implication}`;
+}
+
+function buildNarrativeFocus(tag, cuePhrases, supportingSignals) {
+  if (cuePhrases.length > 0) {
+    return cuePhrases.slice(0, 3).join('、');
+  }
+
+  const distinctiveTerms = extractDistinctiveTerms(supportingSignals, tag);
+  if (distinctiveTerms.length > 0) {
+    return distinctiveTerms.slice(0, 3).join('、');
+  }
+
+  return (NARRATIVE_THEME_CONFIG[tag] || NARRATIVE_THEME_CONFIG.distribution).fallbackFocus;
+}
+
+function buildNarrativeSearchText(signal) {
+  return [
+    signal.title,
+    signal.summary,
+    signal.evidence,
+    signal.rawText
+  ]
+    .join(' ')
+    .toLowerCase();
+}
+
+function findNarrativeCueHits(signal, tag) {
+  const searchText = buildNarrativeSearchText(signal);
+  const cuePhrases = (NARRATIVE_THEME_CONFIG[tag] || NARRATIVE_THEME_CONFIG.distribution).cuePhrases;
+  return cuePhrases.filter((cuePhrase) => searchText.includes(cuePhrase.toLowerCase()));
+}
+
+function extractDistinctiveTerms(signals, tag) {
+  const cuePhraseSet = new Set((NARRATIVE_THEME_CONFIG[tag] || NARRATIVE_THEME_CONFIG.distribution).cuePhrases);
+  const distinctiveTerms = [];
+
+  for (const signal of signals) {
+    const words = buildNarrativeSearchText(signal)
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length >= 4);
+
+    for (const word of words) {
+      if (DISTINCTIVE_WORD_STOPLIST.has(word) || cuePhraseSet.has(word)) continue;
+      distinctiveTerms.push(word);
+    }
+  }
+
+  return uniqueStable(distinctiveTerms);
+}
+
+function uniqueStable(values) {
+  const seen = new Set();
+  const output = [];
+  for (const value of values) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    output.push(String(value || '').trim());
+  }
+  return output;
+}
+
+function pickNarrativeThemeForSignal(signal) {
+  const rankedTags = NARRATIVE_THEME_ORDER
+    .map((tag) => ({
+      tag,
+      score: findNarrativeCueHits(signal, tag).length * 10 + (signal.themeTags.includes(tag) ? 1 : 0)
+    }))
+    .sort((left, right) => right.score - left.score || NARRATIVE_THEME_ORDER.indexOf(left.tag) - NARRATIVE_THEME_ORDER.indexOf(right.tag));
+
+  return rankedTags[0]?.score > 0 ? rankedTags[0].tag : signal.themeTags[0] || 'distribution';
+}
+
+function resolveNarrativeSignals(entry, topSignals) {
+  const supportingSignals = (entry.supportingSignalUrls || [])
+    .map((url) => topSignals.find((signal) => signal.url === url))
+    .filter(Boolean);
+
+  if (supportingSignals.length > 0) {
+    return supportingSignals;
+  }
+
+  return pickSignalsForVerdict(topSignals, entry.tag);
+}
+
+function buildNarrativeArgumentHeadline(entry, index) {
+  const prefix = ['一', '二', '三'][index] || String(index + 1);
+  const config = NARRATIVE_THEME_CONFIG[entry.tag] || NARRATIVE_THEME_CONFIG.distribution;
+  return `论证${prefix}：${entry.focus} 背后的含义是 ${config.argumentHeadline}`;
+}
+
+function buildNarrativeThemeImplication(tag) {
+  switch (tag) {
+    case 'agents':
+      return '这意味着下一步更值得做的，不是再堆一个更通用的入口，而是把关键审核节点和交付回路单独产品化。';
+    case 'research':
+      return '这意味着产品团队不能只复述模型进展，而要把 proof、benchmark 和 evaluation 真的接进发布判断。';
+    case 'distribution':
+      return '这意味着真正的优势会越来越多地来自 launch 节奏、pricing 设计和 package 方式，而不是同质化功能表。';
+    case 'teams':
+      return '这意味着小团队优势不会自动出现，只有把审阅边界、职责切分和 headcount 纪律做细，杠杆才会成立。';
+    default:
+      return '这意味着判断标准要回到真实工作流、真实分发路径和真实组织约束。';
+  }
+}
+
+function buildNarrativeCoreArguments(verdictEntries, topSignals) {
+  return verdictEntries.map((entry, index) => {
+    const supportingSignals = resolveNarrativeSignals(entry, topSignals);
+    const actorLabels = supportingSignals.map((signal) => buildActorLabel(signal));
+    const citations = supportingSignals.map((signal) => ({
+      label: buildActorLabel(signal),
+      url: signal.url
+    }));
+
+    return {
+      title: buildNarrativeArgumentHeadline(entry, index),
+      paragraphs: [
+        `从 ${actorLabels.join('、') || '今天最强的几条信号'} 来看，最该被单独拿出来判断的，不是抽象的 AI 能力，而是 ${entry.focus} 这组具体动作已经被反复提及。它们共同说明，今天的高信号在把“能做”压成“能稳定交付、能被团队接手、能被市场验证”。`,
+        buildNarrativeThemeImplication(entry.tag)
+      ],
+      citations
+    };
+  });
+}
+
+function expandNarrativeVerdict(entry, topSignals, opportunity) {
+  const supportingSignals = resolveNarrativeSignals(entry, topSignals);
+  const actorLabels = supportingSignals.map((signal) => buildActorLabel(signal));
+  const evidenceSummary = supportingSignals
+    .map((signal) => `${buildActorLabel(signal)} 提到的 ${buildNarrativeFocus(entry.tag, findNarrativeCueHits(signal, entry.tag), [signal])}`)
+    .join('、');
+  const opportunityHeadline = opportunity?.headline
+    ? `如果要先做一个动作，优先从“${opportunity.headline}”这类贴近 ${entry.focus} 的环节下手。`
+    : `如果要先做一个动作，就先把 ${entry.focus} 这段链路拆成一个可复盘、可审阅的默认动作。`;
+
+  return `${entry.text} 今天把这个判断撑起来的，是 ${actorLabels.join('、') || '几条最强信号'} 在 ${evidenceSummary || entry.focus} 上给出的连续证据。${opportunityHeadline}`;
+}
+
+function buildNarrativeActionTitle(entry, index) {
+  const prefix = ['一', '二', '三'][index] || String(index + 1);
+  const config = NARRATIVE_THEME_CONFIG[entry.tag] || NARRATIVE_THEME_CONFIG.distribution;
+  return `动作${prefix}：${config.actionTitle}`;
+}
+
+function buildNarrativeActionParagraph(entry, supportingSignals, opportunity, whoToWatch) {
+  const actorLabels = supportingSignals.map((signal) => buildActorLabel(signal));
+  const watchNames = whoToWatch.map((item) => item.name).join('、');
+  const firstSentence = `先围绕 ${entry.focus} 这组动作重新拆工作流，并把 ${actorLabels.join('、') || '今天最强的几条信号'} 当成你要追踪的真实样板。`;
+  const secondSentence = opportunity?.headline
+    ? `它最接近的落点不是抽象战略，而是 ${opportunity.headline} 这种能被团队直接执行的交付动作。`
+    : `重点不是多写一层包装文案，而是让这段链路能被团队稳定重复、稳定审阅。`;
+  const thirdSentence = watchNames
+    ? `接下来持续观察 ${watchNames}，但只记录他们如何把这组信号落实成具体流程。`
+    : '';
+
+  return [firstSentence, secondSentence, thirdSentence].filter(Boolean).join(' ');
+}
+
+function buildNarrativeActionItems(verdictEntries, topSignals, opportunities, whoToWatch) {
+  return verdictEntries.map((entry, index) => {
+    return {
+      title: buildNarrativeActionTitle(entry, index),
+      paragraphs: [
+        buildNarrativeActionParagraph(entry, resolveNarrativeSignals(entry, topSignals), opportunities[index], whoToWatch)
+      ]
+    };
+  });
 }
 
 function renderMarkdown({ generatedAt, verdicts, topSignals, whoToWatch, opportunities, readNext }) {
