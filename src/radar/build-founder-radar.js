@@ -10,6 +10,12 @@ const CANDIDATE_BASE_WEIGHT = {
   podcast: 7
 };
 
+const MAX_SIGNAL_AGE_HOURS = {
+  x: 36,
+  blog: 72,
+  podcast: 72
+};
+
 const THEME_RULES = [
   { tag: 'agents', keywords: ['agent', 'agents', 'tool', 'workflow', 'automation', 'coding'] },
   { tag: 'research', keywords: ['proof', 'research', 'science', 'model', 'open problems'] },
@@ -26,7 +32,8 @@ export function buildFounderRadar(input, options = {}) {
   };
 
   const candidates = collectCandidates(input);
-  const scoredSignals = applyPruningFilters(candidates, normalizedOptions.pruning)
+  const recentCandidates = filterRecentCandidates(candidates, input.generatedAt);
+  const scoredSignals = applyPruningFilters(recentCandidates, normalizedOptions.pruning)
     .map((candidate) => ({ ...candidate, score: scoreCandidate(candidate) }))
     .sort(compareSignals);
   const limitedSignals = applyPerTypeCandidateMax(scoredSignals, normalizedOptions.pruning.max)
@@ -35,7 +42,8 @@ export function buildFounderRadar(input, options = {}) {
   const topSignals = limitedSignals.slice(0, 5);
   const whoToWatch = buildWhoToWatch(limitedSignals);
   const opportunities = buildOpportunitySeeds(topSignals, whoToWatch);
-  const verdicts = buildVerdicts(topSignals);
+  const verdictEntries = buildVerdictEntries(topSignals);
+  const verdicts = verdictEntries.map((entry) => entry.text);
   const readNext = buildReadNext(topSignals, limitedSignals);
   const markdown = renderMarkdown({
     generatedAt: input.generatedAt,
@@ -50,6 +58,7 @@ export function buildFounderRadar(input, options = {}) {
     options: normalizedOptions,
     markdown,
     sections: {
+      verdictEntries,
       verdicts,
       topSignals,
       whoToWatch,
@@ -65,11 +74,12 @@ export function buildDeepFounderRadarReport(input, options = {}) {
   const topSignals = brief.sections.topSignals;
   const whoToWatch = brief.sections.whoToWatch;
   const opportunities = brief.sections.opportunities;
+  const verdictEntries = brief.sections.verdictEntries || buildVerdictEntries(topSignals);
   const report = {
     title: `Founder Radar 深度日报｜${dateLabel}`,
     intro: `这份深度日报继续以 follow-builders 为核心信号输入，只保留本仓库定义的高信号构建者与内容源。今天进入视野的重点，不是单条新闻本身，而是这些信号共同描出的组织、工作流与分发变化：构建者已经开始把模型能力从“能展示”推进到“能交付、能审核、能复盘”。`,
     sections: {
-      todayVerdict: brief.sections.verdicts.map((verdict, index) => expandVerdict(verdict, topSignals, opportunities[index])),
+      todayVerdict: verdictEntries.map((entry, index) => expandVerdict(entry, topSignals, opportunities[index])),
       coreArguments: buildCoreArguments(topSignals),
       counterpoints: buildCounterpoints(topSignals),
       actionItems: buildActionItems(opportunities, whoToWatch),
@@ -167,6 +177,26 @@ function applyPerTypeCandidateMax(scoredSignals, maxByType) {
   const limitedPodcastSignals = maxByType.podcastCandidates ? podcastSignals.slice(0, maxByType.podcastCandidates) : podcastSignals;
 
   return [...limitedXSignals, ...limitedBlogSignals, ...limitedPodcastSignals];
+}
+
+function filterRecentCandidates(candidates, generatedAt) {
+  return candidates.filter((candidate) => isCandidateWithinRecencyWindow(candidate, generatedAt));
+}
+
+function isCandidateWithinRecencyWindow(candidate, generatedAt) {
+  const maxAgeHours = MAX_SIGNAL_AGE_HOURS[candidate.type];
+  if (!maxAgeHours) return true;
+
+  const publishedAt = Date.parse(candidate.publishedAt);
+  const referenceTime = Date.parse(generatedAt || Date.now());
+  if (!Number.isFinite(publishedAt) || !Number.isFinite(referenceTime)) {
+    return true;
+  }
+
+  const ageMs = referenceTime - publishedAt;
+  if (ageMs < 0) return true;
+
+  return ageMs <= maxAgeHours * 60 * 60 * 1000;
 }
 
 function collectCandidates(input) {
@@ -303,6 +333,41 @@ function buildVerdicts(topSignals) {
   }
 
   return verdicts.slice(0, 3);
+}
+
+function buildVerdictEntries(topSignals) {
+  const themeCounts = countThemes(topSignals);
+  const sortedThemes = Object.entries(themeCounts).sort((left, right) => right[1] - left[1]);
+  const verdictEntries = [];
+
+  if (themeCounts.agents) {
+    verdictEntries.push({
+      tag: 'agents',
+      text: 'Agent 工作流仍是今天最强的产品叙事，讨论重心集中在工具编排、自动化交付与效率放大。'
+    });
+  }
+  if (themeCounts.research) {
+    verdictEntries.push({
+      tag: 'research',
+      text: '前沿模型能力仍在向“更强问题求解 + 更优雅证明”延伸，研究进展正在反向抬升产品预期。'
+    });
+  }
+  if (themeCounts.teams || themeCounts.distribution) {
+    verdictEntries.push({
+      tag: themeCounts.teams >= themeCounts.distribution ? 'teams' : 'distribution',
+      text: '小团队高杠杆创业继续强化：创始人和产品负责人都在默认接受“更少人做更多事”。'
+    });
+  }
+
+  while (verdictEntries.length < 3) {
+    const tag = sortedThemes[verdictEntries.length]?.[0];
+    verdictEntries.push({
+      tag,
+      text: fallbackVerdict(tag)
+    });
+  }
+
+  return verdictEntries.slice(0, 3);
 }
 
 function fallbackVerdict(tag) {
@@ -506,9 +571,9 @@ function buildActorLabel(signal) {
   return signal.handle ? `${signal.sourceName} (@${signal.handle})` : signal.sourceName;
 }
 
-function expandVerdict(verdict, topSignals, opportunity) {
-  const referencedActors = topSignals
-    .slice(0, 2)
+function expandVerdict(entry, topSignals, opportunity) {
+  const verdict = entry.text;
+  const referencedActors = pickSignalsForVerdict(topSignals, entry.tag)
     .map((signal) => buildActorLabel(signal))
     .join('、');
   const opportunityLine = opportunity
@@ -516,6 +581,38 @@ function expandVerdict(verdict, topSignals, opportunity) {
     : '从行动层面看，最重要的不是继续收集观点，而是找出你团队里最值得被产品化的一条关键链路。';
 
   return `${verdict} 更具体地说，今天最强的证据不是孤立出现的，而是由 ${referencedActors || '多位核心信号源'} 一起拼出来的同一幅图景：大家都在把 AI 能力往真实工作流、团队杠杆和产品交付上压。${opportunityLine}`;
+}
+
+function pickSignalsForVerdict(topSignals, tag) {
+  const relatedTags = relatedVerdictTags(tag);
+  const matchingSignals = topSignals.filter((signal) => signal.themeTags.some((theme) => relatedTags.includes(theme)));
+
+  if (matchingSignals.length >= 2) {
+    return matchingSignals.slice(0, 2);
+  }
+
+  const fallbackSignals = [...matchingSignals];
+  for (const signal of topSignals) {
+    if (fallbackSignals.length >= 2) break;
+    if (fallbackSignals.some((item) => item.url === signal.url)) continue;
+    fallbackSignals.push(signal);
+  }
+
+  return fallbackSignals.slice(0, 2);
+}
+
+function relatedVerdictTags(tag) {
+  switch (tag) {
+    case 'teams':
+      return ['teams', 'distribution'];
+    case 'distribution':
+      return ['distribution', 'teams'];
+    case 'research':
+      return ['research'];
+    case 'agents':
+    default:
+      return ['agents'];
+  }
 }
 
 function buildCoreArguments(topSignals) {

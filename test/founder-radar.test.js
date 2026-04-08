@@ -304,3 +304,126 @@ test('builds a long-form Chinese digest with fixed sections and source links', (
   assert.equal(result.markdown.includes('## Top Signals'), false);
   assert.equal(result.markdown.includes('## Who to Watch'), false);
 });
+
+test('drops stale podcast signals that fall outside the daily recency window', () => {
+  const result = buildFounderRadar(
+    {
+      generatedAt: '2026-04-06T07:00:00.000Z',
+      x: [
+        {
+          source: 'x',
+          name: 'Fresh Agent',
+          handle: 'freshagent',
+          bio: 'builder',
+          tweets: [
+            {
+              id: 'fresh-1',
+              text: 'Agent workflow automation is finally good enough for real product launches and human review.',
+              createdAt: '2026-04-06T05:30:00.000Z',
+              url: 'https://x.com/freshagent/status/1',
+              likes: 150,
+              retweets: 12,
+              replies: 8,
+              isQuote: false,
+              quotedTweetId: null
+            }
+          ]
+        }
+      ],
+      podcasts: [
+        {
+          source: 'podcast',
+          name: 'Aging Podcast',
+          title: 'A stale episode with a very long transcript',
+          url: 'https://example.com/podcast/stale',
+          publishedAt: '2026-04-02T00:00:00.000Z',
+          transcript: buildUniqueWordTranscript(900)
+        }
+      ],
+      blogs: []
+    },
+    { language: 'zh-CN', style: 'verdict+evidence', delivery: 'lark_dm' }
+  );
+
+  assert.equal(result.sections.topSignals.some((signal) => signal.type === 'podcast'), false);
+  assert.equal(result.sections.topSignals[0]?.handle, 'freshagent');
+});
+
+test('uses theme-relevant evidence when expanding each daily verdict', () => {
+  const result = buildDeepFounderRadarReport(
+    {
+      generatedAt: '2026-04-06T07:00:00.000Z',
+      x: [
+        buildAccount({
+          name: 'Agent Alpha',
+          handle: 'agentalpha',
+          text: 'Agent workflow automation improves code review reliability for production handoffs.',
+          createdAt: '2026-04-06T06:10:00.000Z',
+          likes: 220,
+          retweets: 18,
+          replies: 12
+        }),
+        buildAccount({
+          name: 'Growth Beta',
+          handle: 'growthbeta',
+          text: 'Shipping product launch systems creates stronger growth loops for teams.',
+          createdAt: '2026-04-06T05:55:00.000Z',
+          likes: 180,
+          retweets: 16,
+          replies: 11
+        }),
+        buildAccount({
+          name: 'Research Gamma',
+          handle: 'researchgamma',
+          text: 'Model research and better proofs are resetting the bar for applied products.',
+          createdAt: '2026-04-06T05:10:00.000Z',
+          likes: 40,
+          retweets: 5,
+          replies: 4
+        }),
+        buildAccount({
+          name: 'Team Delta',
+          handle: 'teamdelta',
+          text: 'Startup founder teams are learning to do more with fewer people.',
+          createdAt: '2026-04-06T04:45:00.000Z',
+          likes: 35,
+          retweets: 4,
+          replies: 3
+        })
+      ],
+      podcasts: [],
+      blogs: []
+    },
+    { language: 'zh-CN' }
+  );
+
+  assert.match(result.sections.todayVerdict[1], /Research Gamma \(@researchgamma\)/);
+});
+
+function buildAccount({ name, handle, text, createdAt, likes, retweets, replies }) {
+  return {
+    source: 'x',
+    name,
+    handle,
+    bio: 'builder',
+    tweets: [
+      {
+        id: `${handle}-1`,
+        text,
+        createdAt,
+        url: `https://x.com/${handle}/status/1`,
+        likes,
+        retweets,
+        replies,
+        isQuote: false,
+        quotedTweetId: null
+      }
+    ]
+  };
+}
+
+function buildUniqueWordTranscript(size) {
+  const keywords = ['agent', 'workflow', 'model', 'research', 'team', 'startup', 'product', 'launch', 'shipping'];
+  const filler = Array.from({ length: size }, (_, index) => `topic${index}`);
+  return [...keywords, ...filler].join(' ');
+}
